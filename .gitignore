@@ -2,4 +2,9 @@
 /public/build/
 
 .DS_Store
+
+## Local env files not pushed 
 .env
+
+## Database not pushed
+backend/database.db

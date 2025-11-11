@@ -1,6 +1,9 @@
+// Imports for database
 import sqlite3 from 'sqlite3';
-
 import { open } from 'sqlite';
+
+// Imports for testing (removed later)
+import bcrypt, { hash } from 'bcrypt';
 
 //database name and driver 
 const db = await open ({
@@ -18,9 +21,13 @@ await db.exec(`
 `);
 
 
-//Make and insert test user
+//Make and insert test user (removed later)
 const testEmail = 'test@email.com'
-const testPassword = 'Password123!'
+const password = 'Password123!'
+
+// Hash password 
+const testPassword = await bcrypt.hash(password, 13);
+
 
 
 await db.run(
