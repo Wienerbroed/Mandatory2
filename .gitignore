@@ -5,6 +5,7 @@
 
 ## Local env files not pushed 
 .env
+backend/.env
 
 ## Database not pushed
 backend/database.db

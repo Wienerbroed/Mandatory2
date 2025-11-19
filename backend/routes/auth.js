@@ -2,8 +2,8 @@
 import express from 'express';
 import { db } from '../db/db.js';
 import bcrypt, { hash } from 'bcrypt';
-import { blur } from 'svelte/transition';
-import { construct_svelte_component, subscribe } from 'svelte/internal';
+import { verifyAccessToken } from "../middleware/auth.js";
+import { generateAccessToken, generateRefreshToken } from '../utils/jwt.js';
 
 // Setuo router
 const router = express.Router();
@@ -35,7 +35,21 @@ router.post('/login', async (req, res, next) => {
             return res.json({ error: 'Credentials do not match' });
         }
 
-        return res.json({ success: true, message: 'Login successful' });
+        // Create tokens
+        const accessToken = generateAccessToken(user.id);
+        const refreshToken = generateRefreshToken(user.id);
+
+        // Store refresh token in DB
+        await db.run("UPDATE users SET refreshToken = ? WHERE id = ?", [
+            refreshToken,
+            user.id
+        ]);
+
+        res.json({
+            success: true,
+            accessToken,
+            refreshToken
+        });
 
         // general error for no serve connection
     } catch (err) {
@@ -64,17 +78,59 @@ router.post('/signUp', async (req, res, next) => {
         //Password hasher
         const hashedPassword = await bcrypt.hash(password, 13);
 
-        //Insert user into database
-        await db.run('INSERT INTO users (email, password) VALUES (?, ?)', [email, hashedPassword]);
+        const result = await db.run(
+            "INSERT INTO users (email, password) VALUES (?, ?)",
+            [email, hashedPassword]
+        );
 
-        // succes message
-        return res.status(201).json({success: true, message: 'User registered'});
+        const userId = result.lastID;
+
+        const accessToken = generateAccessToken(userId);
+        const refreshToken = generateRefreshToken(userId);
+
+        await db.run(
+            "UPDATE users SET refreshToken = ? WHERE id = ?", 
+            [refreshToken, userId]
+        );
+
+        res.json({
+            success: true,
+            accessToken,
+            refreshToken
+        });
+
     } catch (err) {
         console.error('Signup error: ', err);
         return res.status(500).json({ success: false, message: 'Server error.'})
     }
 });
 
+router.post("/refresh", async (req, res) => {
+    const { refreshToken } = req.body;
+
+    if (!refreshToken)
+        return res.status(401).json({ error: "Missing refresh token" });
+
+    const user = await db.get(
+        "SELECT * FROM users WHERE refreshToken = ?",
+        [refreshToken]
+    );
+
+    if (!user)
+        return res.status(403).json({ error: "Invalid refresh token" });
+
+    jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET, (err, decoded) => {
+        if (err)
+            return res.status(403).json({ error: "Expired refresh token" });
+
+        const newAccessToken = generateAccessToken(user.id);
+        res.json({ accessToken: newAccessToken });
+    });
+});
+
+router.get("/protected", verifyAccessToken, (req, res) => {
+    res.json({ message: "You accessed a protected route!", user: req.user });
+});
 
 //exports
 export default router;

@@ -2,68 +2,89 @@
     import { createEventDispatcher } from 'svelte';
     const dispatch = createEventDispatcher();
 
-    let email = '';
-    let password = '';
-    let message = '';
+    let email = "";
+    let password = "";
+    let message = "";
     let isLogin = true;
 
+    // Login function
     async function login() {
         try {
-            const res = await fetch('http://localhost:5000/api/auth/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+            const res = await fetch("http://localhost:5000/api/auth/login", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ email, password })
             });
+
             const data = await res.json();
 
             if (data.success) {
-                dispatch('loginSuccess');
+                // Store tokens
+                localStorage.setItem("accessToken", data.accessToken);
+                localStorage.setItem("refreshToken", data.refreshToken);
+
+                dispatch("loginSuccess");
             } else {
-                message = data.error || data.message;
+                message = data.error || data.message || "Login failed.";
             }
         } catch (err) {
-            message = 'Unable to connect to server.';
+            message = "Unable to connect to server.";
         }
     }
 
+    // Signup function
     async function signUp() {
         try {
-            const res = await fetch(`http://localhost:5000/api/auth/signUp`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password})
+            const res = await fetch("http://localhost:5000/api/auth/signUp", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email, password })
             });
 
             const data = await res.json();
-            if(data.success) {
-                message = 'Signup succesful!';
+
+            if (data.success) {
+                message = "Signup successful! You can now log in.";
                 isLogin = true;
             } else {
-                message = data.error || data.message || 'Signup failed.';
+                message = data.error || data.message || "Signup failed.";
             }
         } catch (err) {
-            message = 'Unable to connect to server'
+            message = "Unable to connect to server.";
         }
     }
 </script>
 
 <main>
-    <h1>{isLogin ? 'Login' : 'SignUp'}</h1>
+    <h1>{isLogin ? "Login" : "Sign Up"}</h1>
 
-    <input type="email" placeholder="email@email.com" bind:value={email}>
-    <input type="password" placeholder="Password1!" bind:value={password}>
+    <input
+        type="email"
+        placeholder="email@email.com"
+        bind:value={email} />
+
+    <input
+        type="password"
+        placeholder="Password1!"
+        bind:value={password} />
 
     {#if isLogin}
         <button on:click={login}>Login</button>
         <p>
-            Dont have an account?
-            <a href="#" on:click|preventDefault={() => { isLogin = false; message = ''; }}>Sign up</a>
+            Don't have an account?
+            <a href="#"
+               on:click|preventDefault={() => { isLogin = false; message = "" }}>
+                Sign up
+            </a>
         </p>
-        {:else}
-        <button on:click={signUp}> Sign up</button>
+    {:else}
+        <button on:click={signUp}>Sign Up</button>
         <p>
             Already have an account?
-            <a href="#" on:click|preventDefault={() => {isLogin = true; message = ''; }}>Login</a>
+            <a href="#"
+               on:click|preventDefault={() => { isLogin = true; message = "" }}>
+                Login
+            </a>
         </p>
     {/if}
 
