@@ -49,3 +49,17 @@ await db.run(
 
 
 export { db };
+
+
+// reset Token for forgotten password
+try {
+    await db.exec(`ALTER TABLE users ADD COLUMN resetToken TEXT`);
+} catch (err) {
+    // Column already exists → ignore
+}
+
+try {
+    await db.exec(`ALTER TABLE users ADD COLUMN resetTokenExpires DATETIME`);
+} catch (err) {
+    // Column already exists → ignore
+}

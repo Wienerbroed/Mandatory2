@@ -1,4 +1,5 @@
 <script>
+    import { onMount } from "svelte"; // <- MUST import
     import { authFetch } from "../auth.js";
     import toast from "svelte-french-toast";
 
@@ -15,6 +16,11 @@
     }
 
     async function createPost() {
+        if (!text.trim() && !image.trim()) {
+            toast.error("Cannot post empty content");
+            return;
+        }
+
         const res = await authFetch("http://localhost:5000/api/auth/posts", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -70,28 +76,37 @@
         }
     }
 
-    loadPosts();
+    onMount(() => {
+        loadPosts();
+    });
 </script>
 
 <main>
-    <h1>Posts</h1>
+    <h1>All Posts</h1>
 
-    <h2>{editingId ? "Edit Post" : "New Post"}</h2>
+    <section>
+        <h2>{editingId ? "Edit Post" : "New Post"}</h2>
 
-    <input placeholder="Write something..." bind:value={text} />
-    <input placeholder="Image URL (optional)" bind:value={image} />
+        <input placeholder="Write something..." bind:value={text} />
+        <input placeholder="Image URL (optional)" bind:value={image} />
 
-    {#if editingId}
-        <button on:click={saveEdit}>Save</button>
-    {:else}
-        <button on:click={createPost}>Post</button>
-    {/if}
+        {#if editingId}
+            <button on:click={saveEdit}>Save</button>
+            <button on:click={() => { editingId = null; text=""; image=""; }}>Cancel</button>
+        {:else}
+            <button on:click={createPost}>Post</button>
+        {/if}
+    </section>
 
     <hr />
 
     {#each posts as post}
         <div class="post">
-            <p><strong>{post.email}</strong></p>
+            <p>
+                <strong>
+                    <a href={`#/user/${post.userId}`}>{post.email}</a>
+                </strong>
+            </p>
             <p>{post.text}</p>
 
             {#if post.image}
@@ -113,6 +128,10 @@ main {
     padding: 20px;
 }
 
+section {
+    margin-bottom: 20px;
+}
+
 .post {
     border: 1px solid #ccc;
     padding: 12px;
@@ -125,6 +144,7 @@ main {
     border: none;
     padding: 6px;
     margin-right: 8px;
+    cursor: pointer;
 }
 
 .delete {
@@ -132,10 +152,20 @@ main {
     border: none;
     padding: 6px;
     color: white;
+    cursor: pointer;
 }
 
 img {
     margin-top: 10px;
     border-radius: 8px;
+}
+
+a {
+    color: #007bff;
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
 }
 </style>

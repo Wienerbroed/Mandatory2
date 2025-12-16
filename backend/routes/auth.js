@@ -70,6 +70,22 @@ router.post('/login', async (req, res, next) => {
     }
 });
 
+// LOGOUT
+router.post("/logout", async (req, res) => {
+    const { refreshToken } = req.body;
+
+    if (!refreshToken)
+        return res.json({ success: true });
+
+    // Remove refresh token from DB
+    await db.run(
+        "UPDATE users SET refreshToken = NULL WHERE refreshToken = ?",
+        [refreshToken]
+    );
+
+    res.json({ success: true });
+});
+
 // Signup 
 router.post('/signUp', async (req, res, next) => {
     try{
@@ -157,6 +173,98 @@ router.get("/protected", verifyAccessToken, (req, res) => {
     res.json({ message: "You accessed a protected route!", user: req.user });
 });
 
+
+// Forgot password
+router.post("/forgot-password", async (req, res) => {
+    const { email } = req.body;
+
+    if (!email)
+        return res.status(400).json({ error: "Email required" });
+
+    const user = await db.get(
+        "SELECT * FROM users WHERE email = ?",
+        [email]
+    );
+
+    // Do NOT reveal if user exists
+    if (!user)
+        return res.json({ success: true });
+
+    const resetToken = jwt.sign(
+        { id: user.id },
+        process.env.RESET_PASSWORD_SECRET,
+        { expiresIn: "10m" }
+    );
+
+    const expires = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+
+    await db.run(
+        "UPDATE users SET resetToken = ?, resetTokenExpires = ? WHERE id = ?",
+        [resetToken, expires, user.id]
+    );
+
+    const resetLink = `${process.env.FRONTEND_URL}/#/reset-password?token=${resetToken}`;
+
+    await transporter.sendMail({
+        from: process.env.EMAIL_USER,
+        to: email,
+        subject: "Password Reset",
+        html: `
+            <p>You requested a password reset.</p>
+            <p>
+                <a href="${resetLink}">
+                    Reset Password
+                </a>
+            </p>
+            <p>This link expires in 10 minutes.</p>
+        `
+    });
+
+    res.json({ success: true });
+});
+
+
+// update password
+router.post("/reset-password", async (req, res) => {
+    const { token, password, confirmPassword } = req.body;
+
+    if (!token || !password || !confirmPassword)
+        return res.status(400).json({ error: "Missing fields" });
+
+    if (password !== confirmPassword)
+        return res.status(400).json({ error: "Passwords do not match" });
+
+    let decoded;
+    try {
+        decoded = jwt.verify(token, process.env.RESET_PASSWORD_SECRET);
+    } catch {
+        return res.status(403).json({ error: "Invalid or expired token" });
+    }
+
+    const user = await db.get(
+        `SELECT * FROM users 
+         WHERE id = ? 
+         AND resetToken = ? 
+         AND resetTokenExpires > datetime('now')`,
+        [decoded.id, token]
+    );
+
+    if (!user)
+        return res.status(403).json({ error: "Token expired or invalid" });
+
+    const hashedPassword = await bcrypt.hash(password, 13);
+
+    await db.run(
+        `UPDATE users 
+         SET password = ?, resetToken = NULL, resetTokenExpires = NULL 
+         WHERE id = ?`,
+        [hashedPassword, user.id]
+    );
+
+    res.json({ success: true });
+});
+
+
 // -------------------------------------------------------
 // POSTS CRUD
 // -------------------------------------------------------
@@ -222,6 +330,19 @@ router.delete("/posts/:id", verifyAccessToken, async (req, res) => {
 
     res.json({ success: true });
 });
+
+
+// Get user by ID
+router.get("/user/:id", async (req, res) => {
+    const { id } = req.params;
+
+    const user = await db.get("SELECT email FROM users WHERE id = ?", [id]);
+
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    res.json(user);
+});
+
 
 //exports
 export default router;

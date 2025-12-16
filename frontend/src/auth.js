@@ -23,6 +23,7 @@ export async function authFetch(url, options = {}) {
         if (!refreshData.accessToken) {
             // User must log in again
             localStorage.clear();
+            window.location.href = "/";
             return res;
         }
 
